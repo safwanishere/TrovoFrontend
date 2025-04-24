@@ -1,0 +1,96 @@
+body{
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+h1{
+    text-align: center;
+    font-size: 5rem;
+    font-family: "Sura", serif;
+    font-weight: 400;
+    font-style: normal;
+    color: #2D9951;
+    letter-spacing: 4px;
+    line-height: 100%;
+    margin: 30px 0 10px 0;
+}
+
+.subheading{
+    text-align: center;
+    font-size: 1rem;
+    font-family: "Outfit", sans-serif;
+    color: #656565;
+}
+
+p{
+    font-size: 1.2rem;
+    font-family: "Outfit", sans-serif;
+    color: #1E1E1E;
+}
+
+button{
+    height: 2.5rem;
+    background-color: #85E8A2;
+    padding: 0 15px;
+    border-radius: 15px;
+    border: none;
+
+    font-size: 1.2rem;
+    font-family: "Outfit", sans-serif;
+    color: #2B2B2B;
+}
+
+button:hover{
+    background-color: #2D9951;
+    color: white;
+    cursor: pointer;
+}
+
+button:active{
+    background-color: #85E8A2;
+}
+
+.protein-input{
+    width: 50vw;
+    height: 2.5rem;
+    background-color: white;
+    padding: 0 15px;
+    border-radius: 15px;
+    border: none;
+    
+    font-size: 1.2rem;
+    font-family: "Outfit", sans-serif;
+    color: #2B2B2B;
+}
+
+.input-container{
+    display: flex;
+    padding: 3rem 0;
+    width: 100vw;
+    align-items: center;
+    justify-content: center;
+    gap: 3rem;
+}
+
+.gradient-blob{
+    height: 150vh;
+    width: 150vh;
+    position: absolute;
+    z-index: -1000;
+    border-radius: 50%;
+    filter: blur(45vh);
+    background-color: #85E8A2;
+}
+
+.gradient-blob-1{
+    top: -50px;
+    left: -200px;
+}
+
+.gradient-blob-2{
+    height: 100vh;
+    width: 100vh;
+    top: -20px;
+    right: -250px;
+}
