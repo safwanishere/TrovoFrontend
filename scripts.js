@@ -628,6 +628,285 @@ async function displayVariantData(proteinName) {
     }
 }
 
+// Global variables for sidebar functionality
+let searchTabs = [];
+let activeTabId = null;
+
+// Initialize sidebar
+function initSidebar() {
+    // Add event listeners
+    document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+    document.getElementById('sidebar-close').addEventListener('click', toggleSidebar);
+    document.getElementById('sidebar-overlay').addEventListener('click', toggleSidebar);
+    document.getElementById('add-tab').addEventListener('click', createNewTab);
+    
+    // Initialize first tab without opening sidebar
+    if (searchTabs.length === 0) {
+        // Create first tab without toggling sidebar
+        const tabId = Date.now().toString();
+        const newTab = {
+            id: tabId,
+            name: `Search 1`,
+            proteinName: '',
+            results: null,
+            timestamp: new Date()
+        };
+        
+        // Add to tabs array
+        searchTabs.push(newTab);
+        
+        // Set as active tab
+        activeTabId = tabId;
+    }
+    
+    // Just render tabs without opening sidebar
+    renderTabs();
+}
+
+// Toggle sidebar visibility
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    
+    if (sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('open');
+    } else {
+        sidebar.classList.add('open');
+        overlay.classList.add('open');
+        renderTabs(); // Refresh tabs when opening
+    }
+}
+
+// Create a new search tab
+function createNewTab() {
+    const tabId = Date.now().toString();
+    const newTab = {
+        id: tabId,
+        name: `Search ${searchTabs.length + 1}`,
+        proteinName: '',
+        results: null,
+        timestamp: new Date()
+    };
+    
+    // Add to tabs array
+    searchTabs.push(newTab);
+    
+    // Set as active tab
+    switchToTab(tabId);
+    
+    // Render tabs
+    renderTabs();
+    
+    // Close sidebar after creating a new tab
+    toggleSidebar();
+    
+    // Clear search input
+    document.getElementById('protein-input').value = '';
+    
+    // Hide results container
+    document.getElementById('results-container').style.display = 'none';
+}
+
+// Render tabs in the sidebar
+function renderTabs() {
+    const tabList = document.getElementById('sidebar-tab-list');
+    tabList.innerHTML = '';
+    
+    searchTabs.forEach(tab => {
+        const tabElement = document.createElement('div');
+        tabElement.className = `sidebar-tab ${tab.id === activeTabId ? 'active' : ''}`;
+        tabElement.dataset.tabId = tab.id;
+        
+        tabElement.innerHTML = `
+            <div class="sidebar-tab-name">
+                <span class="sidebar-tab-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </span>
+                ${tab.proteinName || tab.name}
+            </div>
+            <div class="sidebar-tab-actions">
+                <button class="tab-rename" title="Rename tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                </button>
+                <button class="tab-delete" title="Delete tab">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+        
+        // Add event listeners
+        tabElement.addEventListener('click', (e) => {
+            if (!e.target.closest('.sidebar-tab-actions')) {
+                switchToTab(tab.id);
+                toggleSidebar();
+            }
+        });
+        
+        const deleteBtn = tabElement.querySelector('.tab-delete');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTab(tab.id);
+        });
+        
+        const renameBtn = tabElement.querySelector('.tab-rename');
+        renameBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            renameTab(tab.id);
+        });
+        
+        tabList.appendChild(tabElement);
+    });
+}
+
+// Switch to a specific tab
+function switchToTab(tabId) {
+    // Find the tab
+    const tab = searchTabs.find(t => t.id === tabId);
+    if (!tab) return;
+    
+    // Store current tab data if needed
+    if (activeTabId) {
+        saveCurrentTabData();
+    }
+    
+    // Set active tab
+    activeTabId = tabId;
+    
+    // Update UI to show this tab's data
+    loadTabData(tab);
+    
+    // Update sidebar UI
+    renderTabs();
+}
+
+// Save current tab data
+function saveCurrentTabData() {
+    const currentTab = searchTabs.find(t => t.id === activeTabId);
+    if (!currentTab) return;
+    
+    // Save protein name from input
+    currentTab.proteinName = document.getElementById('protein-input').value.trim();
+    
+    // Save current protein context
+    currentTab.currentProtein = currentProtein;
+    
+    // Save results container HTML and section visibility
+    const resultsContainer = document.getElementById('results-container');
+    if (resultsContainer.style.display !== 'none') {
+        currentTab.results = {
+            proteinInfoSection: document.getElementById('protein-info-section').style.display,
+            proteinInfo: document.getElementById('protein-info').innerHTML,
+            analysisSection: document.getElementById('analysis-section').style.display,
+            analysisContainer: document.getElementById('analysis-container').innerHTML,
+            drugsSection: document.getElementById('drugs-section').style.display,
+            drugsContainer: document.getElementById('drugs-container').innerHTML
+        };
+    }
+}
+
+// Load tab data into UI
+function loadTabData(tab) {
+    // Set protein name in input
+    document.getElementById('protein-input').value = tab.proteinName || '';
+    
+    // Restore current protein context
+    currentProtein = tab.currentProtein || null;
+    
+    // Update protein context display if available
+    const proteinContext = document.getElementById("protein-context");
+    if (proteinContext && currentProtein) {
+        proteinContext.innerHTML = `
+            <p><strong>Currently exploring:</strong> <span class="active-protein">${currentProtein}</span>
+            <button class="small-button" onclick="clearProteinContext()">Clear</button></p>
+        `;
+    } else if (proteinContext) {
+        proteinContext.innerHTML = `
+            <p>Start chatting about proteins or search for a specific protein in the Explorer tab.</p>
+        `;
+    }
+    
+    // Load results if available
+    const resultsContainer = document.getElementById('results-container');
+    
+    if (tab.results) {
+        // Show results container
+        resultsContainer.style.display = 'block';
+        
+        // Load section visibility and content
+        document.getElementById('protein-info-section').style.display = tab.results.proteinInfoSection || 'none';
+        document.getElementById('protein-info').innerHTML = tab.results.proteinInfo || '';
+        
+        document.getElementById('analysis-section').style.display = tab.results.analysisSection || 'none';
+        document.getElementById('analysis-container').innerHTML = tab.results.analysisContainer || '';
+        
+        document.getElementById('drugs-section').style.display = tab.results.drugsSection || 'none'; 
+        document.getElementById('drugs-container').innerHTML = tab.results.drugsContainer || '';
+    } else {
+        // Hide results
+        resultsContainer.style.display = 'none';
+    }
+}
+
+// Rename a tab
+function renameTab(tabId) {
+    const tab = searchTabs.find(t => t.id === tabId);
+    if (!tab) return;
+    
+    const newName = prompt('Enter a new name for this tab:', tab.proteinName || tab.name);
+    if (newName !== null && newName.trim() !== '') {
+        tab.name = newName.trim();
+        if (!tab.proteinName) {
+            tab.proteinName = newName.trim();
+        }
+        renderTabs();
+    }
+}
+
+// Delete a tab
+function deleteTab(tabId) {
+    if (searchTabs.length <= 1) {
+        alert('You need at least one search tab.');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to delete this tab?')) {
+        // Remove tab
+        searchTabs = searchTabs.filter(t => t.id !== tabId);
+        
+        // If active tab was removed, switch to first tab
+        if (activeTabId === tabId) {
+            activeTabId = searchTabs[0].id;
+            loadTabData(searchTabs[0]);
+        }
+        
+        // Update UI
+        renderTabs();
+    }
+}
+
+// Modify the existing get_info function to save results to the current tab
+const originalGetInfo = window.get_info;
+window.get_info = async function() {
+    // Call original function
+    await originalGetInfo();
+    
+    // After search completes, save tab data
+    if (activeTabId) {
+        saveCurrentTabData();
+        renderTabs();
+    }
+};
+
 // Event listeners
 document.addEventListener("DOMContentLoaded", function() {
     // Enter key for search
@@ -677,6 +956,9 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Add subtle particle animation to chat background
     initChatAnimation();
+    
+    // Initialize the sidebar
+    initSidebar();
 });
 
 // Add this function for the TROVO animation
