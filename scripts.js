@@ -281,6 +281,15 @@ async function get_info() {
         // Store current protein for chat context
         currentProtein = refinedQuery;
         
+        // Update chat context display if chat tab exists
+        const proteinContext = document.getElementById("protein-context");
+        if (proteinContext) {
+            proteinContext.innerHTML = `
+                <p><strong>Currently exploring:</strong> <span class="active-protein">${refinedQuery}</span>
+                <button class="small-button" onclick="clearProteinContext()">Clear</button></p>
+            `;
+        }
+        
         // Hide the search results section - we're removing it completely
         hideSection("search-results");
         
@@ -318,6 +327,9 @@ async function get_info() {
             `;
             
             showSection("protein-info-section");
+            
+            // Remove variant data call
+            // displayVariantData(refinedQuery);
             
             // Get and display protein structure immediately in the right panel
             const structureData = await getProteinStructure(refinedQuery);
@@ -463,25 +475,8 @@ async function sendChat() {
         return;
     }
     
-    // Custom response for identity questions
-    const identityQuestions = [
-        "who are you", 
-        "who made you", 
-        "what are you", 
-        "who created you",
-        "who developed you"
-    ];
-    
-    // Check if the message matches any identity question patterns
-    const isIdentityQuestion = identityQuestions.some(q => 
-        message.toLowerCase().includes(q) || 
-        message.toLowerCase() === q
-    );
-    
-    // Add message to chat history (except if it's an identity question we'll handle locally)
-    if (!isIdentityQuestion) {
-        chatMessages.push(message);
-    }
+    // Add message to chat history
+    chatMessages.push(message);
     
     // Display user message with animation delay
     addChatMessage("user", message);
@@ -489,57 +484,47 @@ async function sendChat() {
     // Clear input
     chatInput.value = "";
     
-    if (isIdentityQuestion) {
-        // Custom response for identity questions with typing animation
-        setTimeout(() => {
-            addChatMessage("assistant", "Thinking...", "thinking");
-            
-            // Simulate typing with delay
-            setTimeout(() => {
-                // Remove thinking message
-                document.querySelector(".chat-message.thinking").remove();
+    // Show thinking indicator
+    setTimeout(() => {
+        addChatMessage("assistant", `<div class="typing-indicator">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+        </div>`, "thinking");
+        
+        // Get response from API with slight delay for better UX
+        setTimeout(async () => {
+            try {
+                // Include the current protein context if available
+                const contextMessage = currentProtein ? 
+                    `The user is currently exploring the protein: ${currentProtein}. Please provide specific information about this protein in your response.` : "";
                 
-                // Add the custom response with typing animation
-                addChatMessage(
-                    "assistant", 
-                    "I'm an Open-Source ChatBot trained by Team Shadow Slave for a Hackathon Project hosted by Mahindra University.",
-                    "",
-                    true // Enable typing animation
-                );
-            }, 1500);
-        }, 500);
-    } else {
-        // Regular API flow for other questions
-        setTimeout(() => {
-            addChatMessage("assistant", "Thinking...", "thinking");
-            
-            // Get response from API with slight delay for better UX
-            setTimeout(async () => {
-                try {
-                    const response = await sendChatMessage(chatMessages);
+                const contextualMessages = contextMessage ? 
+                    [contextMessage, ...chatMessages] : chatMessages;
+                
+                const response = await sendChatMessage(contextualMessages);
+                
+                if (response.response) {
+                    // Replace "thinking" message with actual response
+                    document.querySelector(".chat-message.thinking").remove();
                     
-                    if (response.response) {
-                        // Replace "thinking" message with actual response
-                        document.querySelector(".chat-message.thinking").remove();
-                        
-                        // Add assistant response with typing effect
-                        addChatMessage("assistant", response.response, "", true);
-                        
-                        // Add to chat history
-                        chatMessages.push(response.response);
-                    } else {
-                        // Replace "thinking" message with error
-                        document.querySelector(".chat-message.thinking").remove();
-                        addChatMessage("assistant", "Sorry, I couldn't process your request.");
-                    }
-                } catch (error) {
+                    // Add assistant response with typing effect
+                    addChatMessage("assistant", response.response, "", true);
+                    
+                    // Add to chat history
+                    chatMessages.push(response.response);
+                } else {
                     // Replace "thinking" message with error
                     document.querySelector(".chat-message.thinking").remove();
-                    addChatMessage("assistant", `Error: ${error.message}`);
+                    addChatMessage("assistant", "Sorry, I couldn't process your request.");
                 }
-            }, 1000);
-        }, 500);
-    }
+            } catch (error) {
+                // Replace "thinking" message with error
+                document.querySelector(".chat-message.thinking").remove();
+                addChatMessage("assistant", `Error: ${error.message}`);
+            }
+        }, 1000);
+    }, 500);
     
     // Scroll to bottom of chat container
     const chatContainer = document.getElementById("chat-messages");
@@ -596,6 +581,53 @@ function addChatMessage(role, content, className = "", useTyping = false) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
+// Add function to clear protein context
+function clearProteinContext() {
+    currentProtein = null;
+    document.getElementById("protein-context").innerHTML = `
+        <p>Start chatting about proteins or search for a specific protein in the Explorer tab.</p>
+    `;
+}
+
+// Add a function to render variant data
+async function displayVariantData(proteinName) {
+    const variantContainer = document.getElementById("variant-data");
+    
+    if (!variantContainer) return;
+    
+    try {
+        variantContainer.innerHTML = `<div class="loading"><div class="spinner"></div><p>Loading variant data...</p></div>`;
+        
+        const variantData = await getProteinVariants(proteinName);
+        
+        if (variantData.error || !variantData.variants || variantData.variants.length === 0) {
+            variantContainer.innerHTML = `<p>No variant information available for this protein.</p>`;
+            return;
+        }
+        
+        let variantHTML = '';
+        variantData.variants.slice(0, 5).forEach(variant => {
+            variantHTML += `
+                <div class="variant-card">
+                    <p><strong>Variant ID:</strong> ${variant.id || 'Unknown'}</p>
+                    <p><strong>Type:</strong> ${variant.type || 'Unknown'}</p>
+                    ${variant.consequence ? `<p><strong>Consequence:</strong> ${variant.consequence}</p>` : ''}
+                    ${variant.clinical_significance ? `<p><strong>Clinical Significance:</strong> ${variant.clinical_significance}</p>` : ''}
+                </div>
+            `;
+        });
+        
+        if (variantData.variants.length > 5) {
+            variantHTML += `<p><em>Showing 5 of ${variantData.variants.length} variants</em></p>`;
+        }
+        
+        variantContainer.innerHTML = variantHTML;
+    } catch (error) {
+        console.error("Error displaying variant data:", error);
+        variantContainer.innerHTML = `<p class="error">Error loading variant information: ${error.message}</p>`;
+    }
+}
+
 // Event listeners
 document.addEventListener("DOMContentLoaded", function() {
     // Enter key for search
@@ -639,4 +671,157 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     }
+    
+    // Initialize TROVO animation with enhanced smoothness
+    initTrovoAnimation();
+    
+    // Add subtle particle animation to chat background
+    initChatAnimation();
 });
+
+// Add this function for the TROVO animation
+function initTrovoAnimation() {
+    const title = document.querySelector("#os-phrases h2");
+    if (!title) return;
+    
+    // Split the text into individual letters for animation
+    const text = title.textContent;
+    title.innerHTML = '';
+    
+    // Create spans for each letter with nested structure for animation
+    for (let i = 0; i < text.length; i++) {
+        const outerSpan = document.createElement('span');
+        const middleSpan = document.createElement('span');
+        const innerSpan = document.createElement('span');
+        
+        innerSpan.textContent = text[i];
+        middleSpan.appendChild(innerSpan);
+        outerSpan.appendChild(middleSpan);
+        title.appendChild(outerSpan);
+        
+        // Add staggered delay to each letter for smoother effect
+        innerSpan.style.animationDelay = `${i * 0.15}s`;
+    }
+    
+    // Initialize the subtitle typing animation after TROVO animation
+    setTimeout(() => {
+        consoleText(['Trusted Resource for Omics and Variant Overview'], 'text', ['#656565']);
+    }, text.length * 150 + 500); // Start after TROVO animation is mostly complete
+}
+
+// Subtitle typing animation function
+function consoleText(words, id, colors) {
+    if (colors === undefined) colors = ['#656565'];
+    
+    var visible = true;
+    var con = document.getElementById('console');
+    var letterCount = 1;
+    var x = 1;
+    var waiting = false;
+    var target = document.getElementById(id);
+    
+    target.setAttribute('style', 'color:' + colors[0]);
+    
+    window.setInterval(function() {
+        if (letterCount === 0 && waiting === false) {
+            waiting = true;
+            target.innerHTML = words[0].substring(0, letterCount);
+            window.setTimeout(function() {
+                var usedColor = colors.shift();
+                colors.push(usedColor);
+                var usedWord = words.shift();
+                words.push(usedWord);
+                x = 1;
+                target.setAttribute('style', 'color:' + colors[0]);
+                letterCount += x;
+                waiting = false;
+            }, 1000);
+        } else if (letterCount === words[0].length + 1 && waiting === false) {
+            waiting = true;
+            window.setTimeout(function() {
+                // Don't reset the text, keep it visible
+                waiting = false;
+            }, 1000);
+        } else if (waiting === false) {
+            target.innerHTML = words[0].substring(0, letterCount);
+            letterCount += x;
+        }
+    }, 80); // Faster typing speed
+    
+    window.setInterval(function() {
+        if (visible === true) {
+            con.className = 'console-underscore hidden';
+            visible = false;
+        } else {
+            con.className = 'console-underscore';
+            visible = true;
+        }
+    }, 400);
+}
+
+// Function to add subtle particle animation to chat background
+function initChatAnimation() {
+    const chatMessages = document.querySelector('.chat-messages');
+    if (!chatMessages) return;
+    
+    // Create particles
+    for (let i = 0; i < 15; i++) {
+        createParticle(chatMessages);
+    }
+}
+
+// Create floating particle in chat background
+function createParticle(container) {
+    const particle = document.createElement('div');
+    particle.className = 'chat-particle';
+    
+    // Random size between 3-8px
+    const size = Math.random() * 5 + 3;
+    
+    // Random position
+    const posX = Math.random() * 100;
+    const posY = Math.random() * 100;
+    
+    // Random opacity
+    const opacity = Math.random() * 0.07 + 0.03;
+    
+    // Random animation duration
+    const duration = Math.random() * 20 + 10;
+    
+    // Styling
+    particle.style.cssText = `
+        position: absolute;
+        width: ${size}px;
+        height: ${size}px;
+        background-color: #2D9951;
+        border-radius: 50%;
+        top: ${posY}%;
+        left: ${posX}%;
+        opacity: ${opacity};
+        pointer-events: none;
+        z-index: 1;
+        animation: floatParticle ${duration}s infinite ease-in-out;
+    `;
+    
+    container.appendChild(particle);
+}
+
+// Add this to your stylesheet
+const style = document.createElement('style');
+style.textContent = `
+@keyframes floatParticle {
+    0%, 100% {
+        transform: translateY(0) translateX(0);
+    }
+    25% {
+        transform: translateY(-20px) translateX(10px);
+    }
+    50% {
+        transform: translateY(0) translateX(20px);
+    }
+    75% {
+        transform: translateY(20px) translateX(10px);
+    }
+}
+`;
+document.head.appendChild(style);
