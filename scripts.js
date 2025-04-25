@@ -1,5 +1,5 @@
 // API base URL - update this when deployed
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://amino-verse-backend1.vercel.app/api";
 
 // Functions for API interactions
 async function refineQuery(query) {
